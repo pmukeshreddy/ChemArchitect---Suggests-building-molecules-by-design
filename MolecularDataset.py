@@ -6,8 +6,15 @@ class MolecularDataset(Dataset):
         #filter smiles
         valid_data = []
         for smiles , apps in zip(smiles_list,applications_list):
-            if self.is_valid_smiles(smiles):
-                valid_data.append((smiles , apps))
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is not None:
+                    # Convert to canonical SMILES
+                    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
+                    if len(canonical_smiles) > 2 and len(canonical_smiles) < 120:
+                         valid_data.append((canonical_smiles , apps))
+            except:
+                continue
         self.data = valid_data
     def is_valid_smiles(self, smiles):
         """Check if SMILES string is valid"""
@@ -20,7 +27,7 @@ class MolecularDataset(Dataset):
         return len(self.data)
     def __getitem__(self,idx):
         smiles , applications = self.data[idx]
-        tokens = self.tokenizer.encoder(smiles)
+        tokens = self.tokenizer.encode(smiles)
         properties = self.property_encoder.encode_application(applications)
         return {
             'tokens': tokens,
