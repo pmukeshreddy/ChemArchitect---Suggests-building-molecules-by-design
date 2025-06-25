@@ -50,3 +50,22 @@ class MolecularTransformer(nn.Module):
         output = self.transformer(combined_emb,src_mask=causal_mask)
         logits = self.output_projection(output)
         return logits
+    def generate(self,properties,tokenizer,max_lenght=128,temperature=1.0, top_k=50):
+        self.eval()
+        device = next(self.parameters()).device
+        with torch.no_grad():
+            tokens = torch.tensor([tokenizer.start_dx],device=device)
+            for _ in range(max_lenght-1):
+                logits = self.forward(tokens,properties.unsqueeze(0))
+                next_logits = logits[0,-1,:] / temperature
+                if top_k > 0:
+                    values , indices = torch.topk(next_logits,top_k)
+                    next_logits = torch.full_like(next_logits,float('-inf'))
+                    next_logits[indices]=values
+                probs = F.softmax(next_logits,dim=-1)
+                next_token = torch.multinomial(probs,1)
+                if next_token.item() == tokenizer.end_idx:
+                    break
+                tokens = torch.cat([tokens,next_token.unsqueeze(0)],dim=1)
+            smiles = tokenizer.decode(tokens[0].cpu().numpy())
+            return smiles
